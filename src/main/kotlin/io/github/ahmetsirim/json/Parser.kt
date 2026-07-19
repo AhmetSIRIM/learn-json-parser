@@ -9,7 +9,7 @@ import io.github.ahmetsirim.json.JsonValue.JsonString
 
 /** Parses a complete JSON document into a [JsonValue] tree. */
 fun parseJson(input: String): JsonValue =
-    Parser(Tokenizer(input).tokenize()).parseDocument()
+    Parser(Tokenizer(input).tokenize().map { it.token }).parseDocument()
 
 /**
  * Recursive-descent parser: one function per grammar production, and

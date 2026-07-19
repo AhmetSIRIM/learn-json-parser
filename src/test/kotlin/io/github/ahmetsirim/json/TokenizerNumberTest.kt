@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
  */
 class TokenizerNumberTest {
 
-    private fun singleToken(input: String): Token = Tokenizer(input).tokenize().first()
+    private fun singleToken(input: String): Token = Tokenizer(input).tokenize().first().token
 
     @Test
     fun `scans an integer`() {

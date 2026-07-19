@@ -8,4 +8,7 @@ package io.github.ahmetsirim.json
  * pays off when malformed input is an expected, inline-handled case.
  * Unchecked because Kotlin has no checked exceptions anyway.
  */
-class JsonParseException(message: String) : RuntimeException(message)
+class JsonParseException(
+    message: String,
+    val position: TextPosition? = null,
+) : RuntimeException(if (position == null) message else "$message at $position")

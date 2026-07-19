@@ -15,9 +15,12 @@ import org.junit.jupiter.api.Test
  */
 class TokenizerTest {
 
+    private fun tokensOf(input: String): List<Token> =
+        Tokenizer(input).tokenize().map { it.token }
+
     @Test
     fun `tokenizes all six structural characters`() {
-        val tokens = Tokenizer("{}[]:,").tokenize()
+        val tokens = tokensOf("{}[]:,")
 
         tokens shouldBe listOf(
             Token.BeginObject,
@@ -36,14 +39,14 @@ class TokenizerTest {
      */
     @Test
     fun `skips whitespace between tokens`() {
-        val tokens = Tokenizer(" \t{\n}\r\n").tokenize()
+        val tokens = tokensOf(" \t{\n}\r\n")
 
         tokens shouldBe listOf(Token.BeginObject, Token.EndObject, Token.EndOfInput)
     }
 
     @Test
     fun `empty input yields only end of input`() {
-        Tokenizer("").tokenize() shouldBe listOf(Token.EndOfInput)
+        tokensOf("") shouldBe listOf(Token.EndOfInput)
     }
 
     /**
@@ -74,7 +77,7 @@ class TokenizerTest {
 
     @Test
     fun `tokenizes the three literal keywords`() {
-        val tokens = Tokenizer("[true, false, null]").tokenize()
+        val tokens = tokensOf("[true, false, null]")
 
         tokens shouldBe listOf(
             Token.BeginArray,
