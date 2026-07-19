@@ -35,7 +35,7 @@ class Tokenizer(private val input: String) {
             't' -> keyword("true", Token.TrueLiteral)
             'f' -> keyword("false", Token.FalseLiteral)
             'n' -> keyword("null", Token.NullLiteral)
-            else -> TODO("unexpected character")
+            else -> throw JsonParseException("Unexpected character '${input[position]}'")
         }
     }
 
@@ -45,7 +45,9 @@ class Tokenizer(private val input: String) {
     }
 
     private fun keyword(word: String, token: Token): Token {
-        if (!input.startsWith(word, position)) TODO("malformed keyword")
+        if (!input.startsWith(word, position)) {
+            throw JsonParseException("Expected keyword '$word'")
+        }
         position += word.length
         return token
     }

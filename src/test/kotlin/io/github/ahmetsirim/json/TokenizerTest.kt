@@ -1,6 +1,8 @@
 package io.github.ahmetsirim.json
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -42,6 +44,32 @@ class TokenizerTest {
     @Test
     fun `empty input yields only end of input`() {
         Tokenizer("").tokenize() shouldBe listOf(Token.EndOfInput)
+    }
+
+    /**
+     * The error message must name the offending character; "invalid
+     * input" alone would leave the reader searching the whole document.
+     */
+    @Test
+    fun `rejects an unexpected character and names it`() {
+        val failure = shouldThrow<JsonParseException> {
+            Tokenizer("{#}").tokenize()
+        }
+
+        failure.message shouldContain "'#'"
+    }
+
+    /**
+     * "tru]" starts like the keyword true but is cut short. The scanner
+     * must demand the whole word instead of accepting a prefix.
+     */
+    @Test
+    fun `rejects a truncated keyword`() {
+        val failure = shouldThrow<JsonParseException> {
+            Tokenizer("[tru]").tokenize()
+        }
+
+        failure.message shouldContain "true"
     }
 
     @Test
