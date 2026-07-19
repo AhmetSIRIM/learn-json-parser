@@ -4,6 +4,7 @@ import io.github.ahmetsirim.json.JsonValue.JsonArray
 import io.github.ahmetsirim.json.JsonValue.JsonBoolean
 import io.github.ahmetsirim.json.JsonValue.JsonNull
 import io.github.ahmetsirim.json.JsonValue.JsonNumber
+import io.github.ahmetsirim.json.JsonValue.JsonObject
 import io.github.ahmetsirim.json.JsonValue.JsonString
 
 /** Parses a complete JSON document into a [JsonValue] tree. */
@@ -38,6 +39,7 @@ internal class Parser(private val tokens: List<Token>) {
             is Token.StringValue -> JsonString(token.value)
             is Token.NumberValue -> JsonNumber(token.value)
             Token.BeginArray -> parseArray()
+            Token.BeginObject -> parseObject()
             else -> throw JsonParseException("Expected a value but found $token")
         }
 
@@ -60,6 +62,38 @@ internal class Parser(private val tokens: List<Token>) {
                 Token.EndArray -> return JsonArray(elements)
                 Token.ValueSeparator -> continue
                 else -> throw JsonParseException("Expected ',' or ']' in array but found $token")
+            }
+        }
+    }
+
+    /**
+     * Called with BeginObject already consumed. Same separator loop as
+     * arrays; the object-specific rules are both about keys: only
+     * strings may be keys, and a duplicate key overwrites the earlier
+     * entry (last-one-wins, matching JavaScript's JSON.parse; RFC 8259
+     * leaves duplicates undefined). A LinkedHashMap keeps document
+     * order for faithful re-serialization.
+     */
+    private fun parseObject(): JsonValue {
+        if (peek() == Token.EndObject) {
+            advance()
+            return JsonObject(emptyMap())
+        }
+        val entries = LinkedHashMap<String, JsonValue>()
+        while (true) {
+            val keyToken = advance()
+            if (keyToken !is Token.StringValue) {
+                throw JsonParseException("Object keys must be strings but found $keyToken")
+            }
+            val separator = advance()
+            if (separator != Token.NameSeparator) {
+                throw JsonParseException("Expected ':' after object key but found $separator")
+            }
+            entries[keyToken.value] = parseValue()
+            when (val token = advance()) {
+                Token.EndObject -> return JsonObject(entries)
+                Token.ValueSeparator -> continue
+                else -> throw JsonParseException("Expected ',' or '}' in object but found $token")
             }
         }
     }
