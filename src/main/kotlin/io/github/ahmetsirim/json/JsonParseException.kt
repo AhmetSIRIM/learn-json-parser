@@ -10,5 +10,5 @@ package io.github.ahmetsirim.json
  */
 class JsonParseException(
     message: String,
-    val position: TextPosition? = null,
-) : RuntimeException(if (position == null) message else "$message at $position")
+    val position: TextPosition,
+) : RuntimeException("$message at $position")

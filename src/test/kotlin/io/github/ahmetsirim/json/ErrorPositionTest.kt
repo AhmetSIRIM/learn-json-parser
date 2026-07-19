@@ -77,6 +77,28 @@ class ErrorPositionTest {
         failure.position shouldBe TextPosition(line = 2, column = 3)
     }
 
+    /**
+     * The parser reports the position of the offending TOKEN, handed
+     * over by the tokenizer; the parser itself never looks at text.
+     */
+    @Test
+    fun `parser error carries the offending token's position`() {
+        val failure = shouldThrow<JsonParseException> {
+            parseJson("[1,\n 2\n false]")
+        }
+
+        failure.position shouldBe TextPosition(line = 3, column = 2)
+    }
+
+    @Test
+    fun `trailing content error points at the extra content`() {
+        val failure = shouldThrow<JsonParseException> {
+            parseJson("{}\ntrue")
+        }
+
+        failure.position shouldBe TextPosition(line = 2, column = 1)
+    }
+
     @Test
     fun `the human-readable message spells out the position`() {
         val failure = shouldThrow<JsonParseException> {
