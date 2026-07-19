@@ -10,16 +10,26 @@ import kotlin.math.abs
 import kotlin.math.floor
 
 /** Renders the value tree as the shortest valid JSON text. */
-fun JsonValue.toCompactJson(): String = JsonWriter().render(this)
+fun JsonValue.toCompactJson(): String = JsonWriter(indentUnit = null).render(this)
 
 /**
- * Owns the output buffer so the recursive walk does not thread a
- * StringBuilder through every call; the pretty variant lands next and
- * will add layout state beside it.
+ * Renders the value tree indented for human eyes, two spaces per
+ * level, matching JSON.stringify's layout. The indent width is fixed
+ * on purpose; a real library makes it a parameter, and that is the
+ * only difference.
  */
-private class JsonWriter {
+fun JsonValue.toPrettyJson(): String = JsonWriter(indentUnit = "  ").render(this)
+
+/**
+ * One traversal serves both formats: compact and pretty differ only
+ * in what happens BETWEEN tokens, so layout is isolated in
+ * [newlineIndent] and the colon, and the tree walk is written once.
+ * Two hand-rolled walkers would inevitably drift apart.
+ */
+private class JsonWriter(private val indentUnit: String?) {
 
     private val out = StringBuilder()
+    private var depth = 0
 
     fun render(value: JsonValue): String {
         writeValue(value)
@@ -37,24 +47,42 @@ private class JsonWriter {
             }
             is JsonObject -> writeContainer('{', '}', value.entries.toList()) { (key, entryValue) ->
                 writeString(key)
-                out.append(':')
+                out.append(if (indentUnit == null) ":" else ": ")
                 writeValue(entryValue)
             }
         }
     }
 
+    /**
+     * Empty containers stay inline as [] and {}; a lone bracket pair
+     * across two lines wastes space and says nothing.
+     */
     private fun <ITEM> writeContainer(
         open: Char,
         close: Char,
         items: List<ITEM>,
         writeItem: (ITEM) -> Unit,
     ) {
+        if (items.isEmpty()) {
+            out.append(open).append(close)
+            return
+        }
         out.append(open)
+        depth++
         items.forEachIndexed { index, item ->
             if (index > 0) out.append(',')
+            newlineIndent()
             writeItem(item)
         }
+        depth--
+        newlineIndent()
         out.append(close)
+    }
+
+    private fun newlineIndent() {
+        if (indentUnit == null) return
+        out.append('\n')
+        repeat(depth) { out.append(indentUnit) }
     }
 
     /**
