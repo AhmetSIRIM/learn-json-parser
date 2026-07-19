@@ -17,6 +17,10 @@ sealed interface Token {
     data object NameSeparator : Token
     data object ValueSeparator : Token
 
+    data object TrueLiteral : Token
+    data object FalseLiteral : Token
+    data object NullLiteral : Token
+
     /**
      * Emitted exactly once, at the end of every token stream. An explicit
      * end marker lets the parser always look at "the next token" without a

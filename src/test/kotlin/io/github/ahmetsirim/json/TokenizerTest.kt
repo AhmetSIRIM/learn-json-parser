@@ -43,4 +43,20 @@ class TokenizerTest {
     fun `empty input yields only end of input`() {
         Tokenizer("").tokenize() shouldBe listOf(Token.EndOfInput)
     }
+
+    @Test
+    fun `tokenizes the three literal keywords`() {
+        val tokens = Tokenizer("[true, false, null]").tokenize()
+
+        tokens shouldBe listOf(
+            Token.BeginArray,
+            Token.TrueLiteral,
+            Token.ValueSeparator,
+            Token.FalseLiteral,
+            Token.ValueSeparator,
+            Token.NullLiteral,
+            Token.EndArray,
+            Token.EndOfInput,
+        )
+    }
 }

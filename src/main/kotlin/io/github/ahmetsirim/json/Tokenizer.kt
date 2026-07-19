@@ -25,17 +25,29 @@ class Tokenizer(private val input: String) {
     private fun nextToken(): Token {
         skipWhitespace()
         if (position == input.length) return Token.EndOfInput
-        val char = input[position]
-        position++
-        return when (char) {
-            '{' -> Token.BeginObject
-            '}' -> Token.EndObject
-            '[' -> Token.BeginArray
-            ']' -> Token.EndArray
-            ':' -> Token.NameSeparator
-            ',' -> Token.ValueSeparator
+        return when (input[position]) {
+            '{' -> consume(Token.BeginObject)
+            '}' -> consume(Token.EndObject)
+            '[' -> consume(Token.BeginArray)
+            ']' -> consume(Token.EndArray)
+            ':' -> consume(Token.NameSeparator)
+            ',' -> consume(Token.ValueSeparator)
+            't' -> keyword("true", Token.TrueLiteral)
+            'f' -> keyword("false", Token.FalseLiteral)
+            'n' -> keyword("null", Token.NullLiteral)
             else -> TODO("unexpected character")
         }
+    }
+
+    private fun consume(token: Token): Token {
+        position++
+        return token
+    }
+
+    private fun keyword(word: String, token: Token): Token {
+        if (!input.startsWith(word, position)) TODO("malformed keyword")
+        position += word.length
+        return token
     }
 
     /**
