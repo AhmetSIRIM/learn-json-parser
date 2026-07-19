@@ -36,6 +36,7 @@ class Tokenizer(private val input: String) {
             'f' -> keyword("false", Token.FalseLiteral)
             'n' -> keyword("null", Token.NullLiteral)
             '"' -> string()
+            '-', in '0'..'9' -> number()
             else -> throw JsonParseException("Unexpected character '${input[position]}'")
         }
     }
@@ -118,6 +119,62 @@ class Tokenizer(private val input: String) {
         position += 4
         return hex.toInt(radix = 16).toChar()
     }
+
+    /**
+     * number = [ minus ] int [ frac ] [ exp ]  (RFC 8259 section 6)
+     *
+     * The grammar is validated by hand and only the vetted lexeme is
+     * handed to toDouble() for the arithmetic. Kotlin's parser is far
+     * more permissive (it takes "+1", "1.", ".5", even "Infinity"), so
+     * leaning on it for validation would silently widen the language.
+     */
+    private fun number(): Token {
+        val start = position
+        if (currentIs('-')) position++
+        scanIntegerPart()
+        if (currentIs('.')) {
+            position++
+            scanRequiredDigits("fraction")
+        }
+        if (currentIs('e') || currentIs('E')) {
+            position++
+            if (currentIs('+') || currentIs('-')) position++
+            scanRequiredDigits("exponent")
+        }
+        return Token.NumberValue(input.substring(start, position).toDouble())
+    }
+
+    /**
+     * int = zero / (digit1-9 *DIGIT). The leading-zero ban exists so a
+     * JSON number can never be misread as octal.
+     */
+    private fun scanIntegerPart() {
+        if (!currentIsDigit()) {
+            throw JsonParseException("Expected a digit in number")
+        }
+        val firstDigit = input[position]
+        position++
+        if (firstDigit == '0') {
+            if (currentIsDigit()) {
+                throw JsonParseException("Leading zero in number")
+            }
+        } else {
+            while (currentIsDigit()) position++
+        }
+    }
+
+    private fun scanRequiredDigits(partName: String) {
+        if (!currentIsDigit()) {
+            throw JsonParseException("Expected a digit in number $partName")
+        }
+        while (currentIsDigit()) position++
+    }
+
+    private fun currentIs(char: Char): Boolean =
+        position < input.length && input[position] == char
+
+    private fun currentIsDigit(): Boolean =
+        position < input.length && input[position] in '0'..'9'
 
     private fun keyword(word: String, token: Token): Token {
         if (!input.startsWith(word, position)) {

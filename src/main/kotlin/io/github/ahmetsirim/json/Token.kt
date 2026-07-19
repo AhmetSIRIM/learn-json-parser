@@ -30,6 +30,15 @@ sealed interface Token {
     data class StringValue(val value: String) : Token
 
     /**
+     * JSON numbers land in a Double, mirroring the JavaScript data model
+     * the format was born from. Integers beyond 2^53 silently lose
+     * precision; a production parser offers BigDecimal or raw-text
+     * access for that case. One numeric type keeps the value tree small
+     * and equality checks trivial.
+     */
+    data class NumberValue(val value: Double) : Token
+
+    /**
      * Emitted exactly once, at the end of every token stream. An explicit
      * end marker lets the parser always look at "the next token" without a
      * null check; the alternative (a nullable peek) spreads null handling
