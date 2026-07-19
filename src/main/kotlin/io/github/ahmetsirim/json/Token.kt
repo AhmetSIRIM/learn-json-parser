@@ -22,6 +22,14 @@ sealed interface Token {
     data object NullLiteral : Token
 
     /**
+     * Carries the DECODED value: escape sequences are resolved during
+     * scanning, so no later stage ever re-reads the raw lexeme. The
+     * alternative (storing the raw text and decoding in the parser)
+     * splits string knowledge across two layers for no gain.
+     */
+    data class StringValue(val value: String) : Token
+
+    /**
      * Emitted exactly once, at the end of every token stream. An explicit
      * end marker lets the parser always look at "the next token" without a
      * null check; the alternative (a nullable peek) spreads null handling
