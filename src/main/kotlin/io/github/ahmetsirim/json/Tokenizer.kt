@@ -12,20 +12,23 @@ package io.github.ahmetsirim.json
 class Tokenizer(private val input: String) {
 
     private var position = 0
+    private var line = 1
+    private var lineStartOffset = 0
 
-    fun tokenize(): List<Token> {
-        val tokens = mutableListOf<Token>()
+    fun tokenize(): List<PositionedToken> {
+        val tokens = mutableListOf<PositionedToken>()
         while (true) {
             val token = nextToken()
             tokens += token
-            if (token == Token.EndOfInput) return tokens
+            if (token.token == Token.EndOfInput) return tokens
         }
     }
 
-    private fun nextToken(): Token {
+    private fun nextToken(): PositionedToken {
         skipWhitespace()
-        if (position == input.length) return Token.EndOfInput
-        return when (input[position]) {
+        val start = currentPosition()
+        if (position == input.length) return PositionedToken(Token.EndOfInput, start)
+        val token = when (input[position]) {
             '{' -> consume(Token.BeginObject)
             '}' -> consume(Token.EndObject)
             '[' -> consume(Token.BeginArray)
@@ -37,8 +40,9 @@ class Tokenizer(private val input: String) {
             'n' -> keyword("null", Token.NullLiteral)
             '"' -> string()
             '-', in '0'..'9' -> number()
-            else -> throw JsonParseException("Unexpected character '${input[position]}'")
+            else -> fail("Unexpected character '${input[position]}'")
         }
+        return PositionedToken(token, start)
     }
 
     private fun consume(token: Token): Token {
@@ -55,7 +59,7 @@ class Tokenizer(private val input: String) {
         val builder = StringBuilder()
         while (true) {
             if (position == input.length) {
-                throw JsonParseException("Unterminated string")
+                fail("Unterminated string")
             }
             when (val char = input[position]) {
                 '"' -> {
@@ -68,9 +72,7 @@ class Tokenizer(private val input: String) {
                 }
                 else -> {
                     if (char < ' ') {
-                        throw JsonParseException(
-                            "Raw control character (code ${char.code}) inside string; use an escape",
-                        )
+                        fail("Raw control character (code ${char.code}) inside string; use an escape")
                     }
                     builder.append(char)
                     position++
@@ -82,7 +84,7 @@ class Tokenizer(private val input: String) {
     /** Called with position just past the backslash. */
     private fun escapeSequence(): Char {
         if (position == input.length) {
-            throw JsonParseException("Unterminated string")
+            fail("Unterminated string")
         }
         val char = input[position]
         position++
@@ -96,7 +98,10 @@ class Tokenizer(private val input: String) {
             'r' -> '\r'
             't' -> '\t'
             'u' -> unicodeEscape()
-            else -> throw JsonParseException("Unknown escape sequence '\\$char'")
+            else -> {
+                position--
+                fail("Unknown escape sequence '\\$char'")
+            }
         }
     }
 
@@ -108,13 +113,13 @@ class Tokenizer(private val input: String) {
      */
     private fun unicodeEscape(): Char {
         if (position + 4 > input.length) {
-            throw JsonParseException("Unterminated string")
+            fail("Unterminated string")
         }
         val hex = input.substring(position, position + 4)
         // toIntOrNull(16) alone would accept a leading sign ("+0FF"),
         // so each character is checked against the hex alphabet first.
         if (hex.any { it.digitToIntOrNull(radix = 16) == null }) {
-            throw JsonParseException("Invalid unicode escape '\\u$hex'")
+            fail("Invalid unicode escape '\\u$hex'")
         }
         position += 4
         return hex.toInt(radix = 16).toChar()
@@ -150,13 +155,13 @@ class Tokenizer(private val input: String) {
      */
     private fun scanIntegerPart() {
         if (!currentIsDigit()) {
-            throw JsonParseException("Expected a digit in number")
+            fail("Expected a digit in number")
         }
         val firstDigit = input[position]
         position++
         if (firstDigit == '0') {
             if (currentIsDigit()) {
-                throw JsonParseException("Leading zero in number")
+                fail("Leading zero in number")
             }
         } else {
             while (currentIsDigit()) position++
@@ -165,7 +170,7 @@ class Tokenizer(private val input: String) {
 
     private fun scanRequiredDigits(partName: String) {
         if (!currentIsDigit()) {
-            throw JsonParseException("Expected a digit in number $partName")
+            fail("Expected a digit in number $partName")
         }
         while (currentIsDigit()) position++
     }
@@ -178,7 +183,7 @@ class Tokenizer(private val input: String) {
 
     private fun keyword(word: String, token: Token): Token {
         if (!input.startsWith(word, position)) {
-            throw JsonParseException("Expected keyword '$word'")
+            fail("Expected keyword '$word'")
         }
         position += word.length
         return token
@@ -188,12 +193,27 @@ class Tokenizer(private val input: String) {
      * JSON whitespace is exactly space, tab, LF and CR (RFC 8259).
      * Char.isWhitespace() would also accept Unicode spaces such as NBSP,
      * silently widening the grammar beyond the spec.
+     *
+     * This is also the ONLY place a raw newline can be consumed: strings
+     * reject raw control characters, so no token ever spans lines. That
+     * is why a single line counter updated here is enough for every
+     * position the tokenizer will ever report.
      */
     private fun skipWhitespace() {
         while (position < input.length && input[position] in JSON_WHITESPACE) {
+            if (input[position] == '\n') {
+                line++
+                lineStartOffset = position + 1
+            }
             position++
         }
     }
+
+    private fun currentPosition(): TextPosition =
+        TextPosition(line = line, column = position - lineStartOffset + 1)
+
+    private fun fail(message: String): Nothing =
+        throw JsonParseException(message, currentPosition())
 
     private companion object {
         val JSON_WHITESPACE = charArrayOf(' ', '\t', '\n', '\r')
