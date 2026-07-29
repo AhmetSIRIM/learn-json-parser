@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
  */
 class TokenizerStringTest {
 
-    private fun singleToken(input: String): Token = Tokenizer(input).tokenize().first()
+    private fun singleToken(input: String): Token = Tokenizer(input).tokenize().first().token
 
     @Test
     fun `scans a plain string`() {

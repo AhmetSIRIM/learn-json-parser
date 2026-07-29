@@ -46,3 +46,11 @@ sealed interface Token {
      */
     data object EndOfInput : Token
 }
+
+/**
+ * A token plus where its first character sits in the source text.
+ * Position lives in a wrapper instead of a field on Token so keyword
+ * and structural tokens stay singleton objects and token equality
+ * stays purely structural for the parser and the tests.
+ */
+data class PositionedToken(val token: Token, val position: TextPosition)

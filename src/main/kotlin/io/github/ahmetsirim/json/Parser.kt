@@ -17,22 +17,26 @@ fun parseJson(input: String): JsonValue =
  * direct way to turn a grammar into code; the price is that document
  * depth becomes stack depth, so a hostile deeply-nested input can
  * overflow the stack where an explicit-stack parser would not.
+ *
+ * Positions come free with the tokens; the parser never touches the
+ * source text, it just points at the token that broke the grammar.
  */
-internal class Parser(private val tokens: List<Token>) {
+internal class Parser(private val tokens: List<PositionedToken>) {
 
     private var index = 0
 
     fun parseDocument(): JsonValue {
         val value = parseValue()
         val trailing = advance()
-        if (trailing != Token.EndOfInput) {
-            throw JsonParseException("Expected end of input but found $trailing")
+        if (trailing.token != Token.EndOfInput) {
+            fail("Expected end of input but found ${trailing.token}", trailing)
         }
         return value
     }
 
-    private fun parseValue(): JsonValue =
-        when (val token = advance()) {
+    private fun parseValue(): JsonValue {
+        val positioned = advance()
+        return when (val token = positioned.token) {
             Token.TrueLiteral -> JsonBoolean(true)
             Token.FalseLiteral -> JsonBoolean(false)
             Token.NullLiteral -> JsonNull
@@ -40,8 +44,9 @@ internal class Parser(private val tokens: List<Token>) {
             is Token.NumberValue -> JsonNumber(token.value)
             Token.BeginArray -> parseArray()
             Token.BeginObject -> parseObject()
-            else -> throw JsonParseException("Expected a value but found $token")
+            else -> fail("Expected a value but found $token", positioned)
         }
+    }
 
     /**
      * Called with BeginArray already consumed. The empty case is
@@ -58,10 +63,11 @@ internal class Parser(private val tokens: List<Token>) {
         val elements = mutableListOf<JsonValue>()
         while (true) {
             elements += parseValue()
-            when (val token = advance()) {
+            val positioned = advance()
+            when (positioned.token) {
                 Token.EndArray -> return JsonArray(elements)
                 Token.ValueSeparator -> continue
-                else -> throw JsonParseException("Expected ',' or ']' in array but found $token")
+                else -> fail("Expected ',' or ']' in array but found ${positioned.token}", positioned)
             }
         }
     }
@@ -82,23 +88,28 @@ internal class Parser(private val tokens: List<Token>) {
         val entries = LinkedHashMap<String, JsonValue>()
         while (true) {
             val keyToken = advance()
-            if (keyToken !is Token.StringValue) {
-                throw JsonParseException("Object keys must be strings but found $keyToken")
+            val key = keyToken.token
+            if (key !is Token.StringValue) {
+                fail("Object keys must be strings but found $key", keyToken)
             }
             val separator = advance()
-            if (separator != Token.NameSeparator) {
-                throw JsonParseException("Expected ':' after object key but found $separator")
+            if (separator.token != Token.NameSeparator) {
+                fail("Expected ':' after object key but found ${separator.token}", separator)
             }
-            entries[keyToken.value] = parseValue()
-            when (val token = advance()) {
+            entries[key.value] = parseValue()
+            val positioned = advance()
+            when (positioned.token) {
                 Token.EndObject -> return JsonObject(entries)
                 Token.ValueSeparator -> continue
-                else -> throw JsonParseException("Expected ',' or '}' in object but found $token")
+                else -> fail("Expected ',' or '}' in object but found ${positioned.token}", positioned)
             }
         }
     }
 
-    private fun peek(): Token = tokens[index]
+    private fun peek(): Token = tokens[index].token
 
-    private fun advance(): Token = tokens[index++]
+    private fun advance(): PositionedToken = tokens[index++]
+
+    private fun fail(message: String, at: PositionedToken): Nothing =
+        throw JsonParseException(message, at.position)
 }
